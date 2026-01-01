@@ -30,7 +30,7 @@ function renderGrid(list) {
     ].filter(Boolean).join("");
 
     return `
-      <a class="card" href="/profile.html?id=${encodeURIComponent(c.id)}">
+      <a class="card" href="profile.html?id=${encodeURIComponent(c.id)}">
         <div class="cardMedia">
           <img src="${c.coverImage}" alt="${c.name}" />
           ${badges ? `<div class="cardBadges">${badges}</div>` : ``}
@@ -55,7 +55,7 @@ function initHome() {
   form.addEventListener("submit", (e) => {
     e.preventDefault();
     const q = $("#q").value.trim();
-    location.href = `/browse.html?q=${encodeURIComponent(q)}`;
+    location.href = `browse.html?q=${encodeURIComponent(q)}`;
   });
 }
 

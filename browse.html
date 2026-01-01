@@ -1,0 +1,81 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="/style.css" />
+  <title>Browse — CosCommission</title>
+</head>
+<body>
+  <div class="betaBanner">
+    🚧 Beta preview — profiles shown are demo data for testing only.
+    <a href="/signup.html">Join the beta</a>
+  </div>
+
+  <header class="top">
+    <a class="logo" href="/">CosCommission</a>
+    <nav>
+      <a href="/browse.html">Browse</a>
+      <a href="/signup.html">Sign up (Beta)</a>
+      <a href="/about.html">About</a>
+    </nav>
+  </header>
+
+  <main class="wrap">
+    <h1>Browse (Beta)</h1>
+    <p class="note">
+      Profiles shown below are <strong>demo listings</strong> for testing the product experience.
+      Real cosplayers will appear when beta opens.
+    </p>
+
+    <form class="browseTop" id="browseForm">
+      <!-- Primary search -->
+      <input
+        id="q"
+        type="text"
+        class="browseSearch primary"
+        placeholder="Search by series or character"
+      />
+
+      <!-- Secondary row -->
+      <div class="browseSecondary">
+        <div class="pillGroup">
+          <span class="pillIcon">📍</span>
+          <input id="loc" type="text" class="pillInput" placeholder="Location (city / postal code)" />
+          <span class="pillDivider"></span>
+          <select id="radius" class="pillSelect">
+            <option value="5">within 5 mi</option>
+            <option value="10" selected>within 10 mi</option>
+            <option value="25">within 25 mi</option>
+            <option value="50">within 50 mi</option>
+          </select>
+        </div>
+
+        <!-- Filters dropdown (works without JS) -->
+        <details class="filterDetails" id="filters">
+          <summary class="ghostBtn">Filters</summary>
+          <div class="filterGrid">
+            <label class="chip"><input id="fVirtual" type="checkbox" /> Virtual</label>
+            <label class="chip"><input id="fInPerson" type="checkbox" /> In-person</label>
+
+            <select id="fMaxRate">
+              <option value="">Any price</option>
+              <option value="50">≤ $50/hr</option>
+              <option value="80">≤ $80/hr</option>
+              <option value="120">≤ $120/hr</option>
+              <option value="200">≤ $200/hr</option>
+            </select>
+          </div>
+        </details>
+
+        <button id="applyBtn" type="submit" class="primaryBtn">Search</button>
+      </div>
+    </form>
+
+    <div id="grid" class="grid"></div>
+  </main>
+
+  <script src="/data.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

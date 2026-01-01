@@ -7,21 +7,44 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <main class="wrap split">
-    <div class="media">
-        <img class="hero" src="assets/hero.jpg" alt="coscommission.com" />
+    <div class="betaBanner">
+      🚧 Beta preview — profiles shown are demo data for testing only.  
+      <a href="/signup.html">Join the beta</a>
     </div>
 
-    <div class="copy">
-      <h1>coscommission.com</h1>
+      <header class="top">
+      <a class="logo" href="/">CosCommission</a>
+      <nav>
+        <a href="/browse.html">Browse</a>
+        <a href="/signup.html">Sign up (Beta)</a>
+        <a href="/about.html">About</a>
+      </nav>
+    </header>
+
+    <main class="hero">
+      <h1>Where Cosplay Becomes a Contract.</h1>
+      <!--
       <p class="subtitle">
-        CosCommission — Where Cosplay Becomes a Contract.<br>
-		<strong>全球Cos委托平台</strong>
+        Because sometimes, loving a character means wanting to meet them — on the other side of the screen.
+      </p>      
+      -->
+      <p class="subtitle">
+        A beta preview of a platform for commissioning cosplayers —
+        inspired by the popular Chinese Cos 委托.
       </p>
-        <a class="btn" href="https://www.afternic.com/domain/coscommission.com" target="_blank" rel="noopener">
-        Buy this domain for $9999
-        </a>
-    </div>
+
+      <form id="searchForm" class="search">
+        <input id="q" type="text" placeholder="Search: Genshin, Raiden, Gojo..." />
+        <button type="submit">Search</button>
+      </form>
+      <!--
+      <div class="note">
+        The popular Chinese Cos委托 — brought to the globe.
+      </div>
+       -->
     </main>
+
+    <script src="/data.js"></script>
+    <script src="/app.js"></script>
   </body>
 </html>

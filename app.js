@@ -49,7 +49,7 @@ function matchesQuery(cosplayer, q) {
   return hay.includes(q);
 }
 
-function renderGrid(list) {
+function renderGrid(list, q) {
   const grid = $("#grid");
   if (!grid) return;
 
@@ -58,7 +58,6 @@ function renderGrid(list) {
     const showInPerson = !!c.availability?.inPerson;
     const city = c.availability?.location || "";
 
-    // Build overlay badges (only show location with In-person)
     const badges = [
       showVirtual ? `<span class="badge badgeVirtual">💻 Virtual</span>` : "",
       showInPerson
@@ -66,10 +65,12 @@ function renderGrid(list) {
         : ""
     ].filter(Boolean).join("");
 
+    const thumb = pickThumbForQuery(c, q) || c.coverImage || "images/placeholder.png";
+
     return `
       <a class="card" href="profile.html?id=${encodeURIComponent(c.id)}">
         <div class="cardMedia">
-          <img src="${c.coverImage}" alt="${c.name}" />
+          <img src="${thumb}" alt="${c.name}">
           ${badges ? `<div class="cardBadges">${badges}</div>` : ``}
         </div>
 
@@ -83,6 +84,7 @@ function renderGrid(list) {
     `;
   }).join("");
 }
+
 
 
 
@@ -149,7 +151,7 @@ $("#fMaxRate") && ($("#fMaxRate").value = "");
       );
     }
 
-    renderGrid(list);
+    renderGrid(list, q2);
   }
 
   // Bind once (NOT inside apply)
@@ -229,6 +231,22 @@ function initProfile() {
   }
 
   loadAndRender();
+}
+
+function pickThumbForQuery(c, q) {
+  const query = (q || "").trim().toLowerCase();
+  if (!query) return c.coverImage;
+
+  const tokens = query.split(/\s+/).filter(Boolean);
+
+  // Find first portfolio shot whose tags match ANY token
+  for (const shot of (c.portfolio || [])) {
+    const tags = (shot.tags || []).map(t => String(t).toLowerCase());
+    if (tokens.some(tok => tags.some(tag => tag.includes(tok)))) {
+      return shot.image;
+    }
+  }
+  return c.coverImage;
 }
 
 

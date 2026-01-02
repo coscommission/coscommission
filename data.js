@@ -1,7 +1,7 @@
 window.COSPLAYERS = [
   {
-    id: "Zoey",
-    name: "zoey",
+    id: "zoey",
+    name: "Zoey",
     isDemo: true,
     rate: 80,
     availability: { virtual: true, inPerson: true, location: "Toronto" },

@@ -1,6 +1,43 @@
 function $(sel) { return document.querySelector(sel); }
 function getParam(name) { return new URLSearchParams(location.search).get(name) || ""; }
 
+async function fetchCosplayersFromDB() {
+  // If supabase isn't configured yet, return null so we can fall back to demo data
+  if (!window.supabaseClient) return null;
+
+  const { data, error } = await window.supabaseClient
+    .from("cosplayer_profiles")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    console.warn("Supabase fetch failed:", error);
+    return null;
+  }
+  return (data || []).map(normalizeRowToCosplayer);
+}
+
+function normalizeRowToCosplayer(row) {
+  // Convert DB shape -> the exact shape your UI expects today
+  return {
+    id: row.slug, // IMPORTANT: your profile link uses ?id=... and you used id strings like "zoey"
+    name: row.name,
+    isDemo: !!row.is_demo,
+    rate: row.rate,
+    availability: {
+      virtual: !!row.virtual,
+      inPerson: !!row.in_person,
+      location: row.location || ""
+    },
+    boundaries: row.boundaries || { publicOnly: false, noTouch: false, customRequests: false },
+    responseTime: row.response_time || "",
+    completedCount: row.completed_count || 0,
+    contact: row.contact || {},
+    coverImage: row.cover_image || "",
+    portfolio: row.portfolio || []
+  };
+}
+
 function matchesQuery(cosplayer, q) {
   if (!q) return true;
   q = q.toLowerCase();
@@ -72,6 +109,17 @@ $("#fMaxRate") && ($("#fMaxRate").value = "");
   const locInput = $("#loc");
   if (locInput) locInput.value = locQ;
 
+    // Load from DB once, then fall back to demo data if DB is empty or unreachable
+  (async () => {
+    const fromDB = await fetchCosplayersFromDB();
+    if (fromDB && fromDB.length) {
+      window.__COSPLAYERS_RUNTIME = fromDB;
+    } else {
+      window.__COSPLAYERS_RUNTIME = window.COSPLAYERS || [];
+    }
+    apply();
+  })();
+
   function apply() {
     const q2 = $("#q")?.value.trim() || "";
     const loc = $("#loc")?.value.trim() || "";
@@ -79,7 +127,8 @@ $("#fMaxRate") && ($("#fMaxRate").value = "");
     const wantInPerson = $("#fInPerson")?.checked || false;
     const maxRate = Number($("#fMaxRate")?.value || 0);
 
-    let list = window.COSPLAYERS.filter(c => matchesQuery(c, q2));
+    let base = window.__COSPLAYERS_RUNTIME || window.COSPLAYERS || [];
+    let list = base.filter(c => matchesQuery(c, q2));
 
     // OR logic for service type
     if (wantVirtual || wantInPerson) {
@@ -113,50 +162,75 @@ $("#fMaxRate") && ($("#fMaxRate").value = "");
   $("#q")?.addEventListener("keydown", (e) => { if (e.key === "Enter") apply(); });
   $("#loc")?.addEventListener("keydown", (e) => { if (e.key === "Enter") apply(); });
 
-  apply();
 }
 
 
 function initProfile() {
   const id = getParam("id");
-  const c = window.COSPLAYERS.find(x => x.id === id);
-  if (!c) { $("#profile")?.replaceChildren(document.createTextNode("Cosplayer not found.")); return; }
 
-  $("#name").textContent = c.name;
-  $("#rate").textContent = `$${c.rate}/hr`;
+  async function loadAndRender() {
+    const fromDB = await fetchCosplayersFromDB();
+    if (fromDB && fromDB.length) {
+      window.__COSPLAYERS_RUNTIME = fromDB;
+    }
+
+    const base = window.__COSPLAYERS_RUNTIME || window.COSPLAYERS || [];
+    const c = base.find(x => x.id === id);
+
+    if (!c) {
+      $("#profile")?.replaceChildren(
+        document.createTextNode("Cosplayer not found.")
+      );
+      return;
+    }
+
+    $("#name").textContent = c.name;
+    $("#rate").textContent = `$${c.rate}/hr`;
+
     const parts = [];
     if (c.availability.virtual) parts.push("💻 Virtual");
     if (c.availability.inPerson) parts.push("🌍 In-person");
-    if (c.availability.inPerson && c.availability.location) parts.push(`📍 ${c.availability.location}`);
+    if (c.availability.inPerson && c.availability.location)
+      parts.push(`📍 ${c.availability.location}`);
     $("#availability").textContent = parts.join(" · ") || "—";
 
+    $("#stats").textContent = c.isDemo
+      ? "Demo profile"
+      : `${c.completedCount} completed · ${c.responseTime}`;
 
-  $("#stats").textContent = `${c.completedCount} completed · ${c.responseTime}`;
-  if (c.isDemo) $("#stats").textContent = "Demo profile";
+    $("#bPublic").textContent = c.boundaries.publicOnly
+      ? "📍 Public spaces only"
+      : "—";
+    $("#bTouch").textContent = c.boundaries.noTouch
+      ? "🚫 No physical contact"
+      : "—";
+    $("#bCustom").textContent = c.boundaries.customRequests
+      ? "➕ Accepts new characters / custom requests"
+      : "—";
 
-  $("#bPublic").textContent = c.boundaries.publicOnly ? "✅ Public spaces only" : "—";
-  $("#bTouch").textContent = c.boundaries.noTouch ? "🚫 No physical contact" : "—";
-  $("#bCustom").textContent = c.boundaries.customRequests ? "✅ Accepts new characters / custom requests" : "—";
+    const contacts = $("#contacts");
+    contacts.innerHTML = "";
+    Object.entries(c.contact).forEach(([k, v]) => {
+      const a = document.createElement("a");
+      a.className = "btn";
+      a.href = v;
+      a.target = "_blank";
+      a.rel = "noopener";
+      a.textContent = `Contact via ${k}`;
+      contacts.appendChild(a);
+    });
 
-  const contacts = $("#contacts");
-  contacts.innerHTML = "";
-  Object.entries(c.contact).forEach(([k, v]) => {
-    const a = document.createElement("a");
-    a.className = "btn";
-    a.href = v;
-    a.target = "_blank";
-    a.rel = "noopener";
-    a.textContent = `Contact via ${k}`;
-    contacts.appendChild(a);
-  });
+    $("#gallery").innerHTML = c.portfolio.map(p => `
+      <div class="shot">
+        <img src="${p.image}" alt="" />
+        <div class="tags">${p.tags.map(t => `#${t}`).join(" ")}</div>
+      </div>
+    `).join("");
+  }
 
-  $("#gallery").innerHTML = c.portfolio.map(p => `
-    <div class="shot">
-      <img src="${p.image}" alt="" />
-      <div class="tags">${p.tags.map(t => `#${t}`).join(" ")}</div>
-    </div>
-  `).join("");
+  loadAndRender();
 }
+
 
 document.addEventListener("DOMContentLoaded", () => {
   initHome();

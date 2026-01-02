@@ -419,3 +419,8 @@ p { opacity: 0.9; line-height: 1.5; }
     margin-left: 0; /* overrides desktop spacing */
   }
 }
+
+.bullets div {
+  color: rgba(255,255,255,0.75);
+  font-size: 15px;
+}

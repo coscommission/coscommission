@@ -5,12 +5,29 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link rel="stylesheet" href="style.css" />
   <title>Sign up (Beta) — CosCommission</title>
+  <style>
+    /* Local modal styles (so you don't have to touch style.css) */
+    .ccModalBackdrop{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;padding:16px;z-index:9999;}
+    .ccModal{width:min(860px,100%);background:#0b0f14;border:1px solid #1b2330;border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.55);overflow:hidden;}
+    .ccModalHeader{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #1b2330;}
+    .ccModalTitle{font-size:16px;font-weight:700;}
+    .ccModalBody{padding:16px;}
+    .ccPreviewGrid{display:grid;grid-template-columns:240px 1fr;gap:16px;}
+    .ccPreviewImg{width:100%;aspect-ratio:1/1;border-radius:14px;object-fit:cover;border:1px solid #1b2330;background:#0f141b;}
+    .ccMiniRow{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:10px;}
+    .ccMiniPill{border:1px solid #1b2330;border-radius:999px;padding:6px 10px;font-size:13px;background:#0f141b;}
+    .ccReq{margin-top:10px;padding:10px 12px;border-radius:12px;border:1px solid #1b2330;background:#0f141b;}
+    .ccReq.ok{border-color:rgba(78,193,129,.5);}
+    .ccReq.bad{border-color:rgba(255,92,92,.55);}
+    @media (max-width:720px){.ccPreviewGrid{grid-template-columns:1fr;}}
+  </style>
 </head>
 <body>
-    <div class="betaBanner">
-    🚧 Beta preview — profiles shown are demo data for testing only.  
+  <div class="betaBanner">
+    🚧 Beta preview — profiles shown are demo data for testing only.
     <a href="signup.html">Join the beta</a>
-    </div>
+  </div>
+
   <header class="top">
     <a class="logo" href="/">CosCommission</a>
     <nav>
@@ -20,21 +37,22 @@
     </nav>
   </header>
 
-    <main class="wrap">
+  <main class="wrap">
     <h1>Sign up (Beta)</h1>
 
     <p>CosCommission is a discovery platform. We don’t handle payments or disputes.</p>
     <div class="btnRow">
-        <a class="btn" href="https://docs.google.com/forms/d/e/1FAIpQLSdNKLjUEO9HQQky7cgpvzKlka7ZTg8WiDDJ716ScG8B5Dsdhg/viewform?usp=dialog" target="_blank" rel="noopener">
+      <a class="btn" href="https://docs.google.com/forms/d/e/1FAIpQLSdNKLjUEO9HQQky7cgpvzKlka7ZTg8WiDDJ716ScG8B5Dsdhg/viewform?usp=dialog" target="_blank" rel="noopener">
         Sign up for early access
-        </a>
+      </a>
     </div>
+
     <hr style="margin: 28px 0; border: none; border-top: 1px solid #1b2330;" />
 
     <section class="panel">
       <h2>Cosplayer beta (Create your profile)</h2>
       <p class="note">
-        This creates a real listing in the beta database. Only you can edit your own profile.
+        Save a draft first, preview it, then publish when ready. Only you can edit your own profile.
       </p>
 
       <!-- Auth -->
@@ -46,14 +64,12 @@
         <button class="btn" id="signOutBtn" type="button" style="display:none;">Sign out</button>
       </div>
 
-      <div id="authStatus" class="note" style="margin-top:10px;">
-        Not signed in.
-      </div>
+      <div id="authStatus" class="note" style="margin-top:10px;">Not signed in.</div>
 
       <!-- Profile Form -->
       <form id="cosplayerForm" style="margin-top:16px; display:none;">
         <div class="note" style="margin-bottom:10px;">
-          Tip: Start simple. You can add portfolio uploads later.
+          Drafts won’t appear in Browse. Publishing requires a contact + a photo.
         </div>
 
         <div class="filters" style="margin:0;">
@@ -67,15 +83,15 @@
           <label class="chip"><input id="pInPerson" type="checkbox" /> In-person</label>
         </div>
 
-        <div class="note" style="margin-top:10px;">
-          Contact link (Instagram, XHS, WeChat link, email mailto:, etc.)
-        </div>
-        <input id="pContactLink" type="text" placeholder="https://instagram.com/yourhandle" />
+        <div class="note" style="margin-top:10px;">Contact link (Instagram / XHS / WeChat link / email mailto:)</div>
+        <input id="pContactLink" type="text" placeholder="https://instagram.com/yourhandle or mailto:you@email.com" />
 
-        <div class="btnRow" style="margin-top:14px;">
-          <button id="saveProfileBtn" class="primaryBtn" type="submit" form="cosplayerForm">
-            Save my profile
-          </button>
+        <div class="note" style="margin-top:10px;">Cover photo URL (required to publish)</div>
+        <input id="pCoverImage" type="text" placeholder="https://...jpg" />
+
+        <div class="btnRow" style="margin-top:14px; gap:10px; flex-wrap:wrap;">
+          <button id="saveDraftBtn" class="btn" type="button">Save draft</button>
+          <button id="previewBtn" class="primaryBtn" type="button">Preview & publish</button>
         </div>
 
         <div id="saveMsg" class="note" style="margin-top:10px;"></div>
@@ -83,211 +99,363 @@
     </section>
 
     <div class="note" style="margin-top:14px;">
-        Safety reminder: Cosplayers are never required to meet outside public spaces or allow physical contact. Decline or block anyone who makes you uncomfortable.
+      Safety reminder: Cosplayers are never required to meet outside public spaces or allow physical contact.
+      Decline or block anyone who makes you uncomfortable.
     </div>
-    </main>
+  </main>
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabaseClient.js"></script>
+  <!-- Preview / Publish modal -->
+  <div id="previewBackdrop" class="ccModalBackdrop" aria-hidden="true">
+    <div class="ccModal" role="dialog" aria-modal="true" aria-labelledby="previewTitle">
+      <div class="ccModalHeader">
+        <div id="previewTitle" class="ccModalTitle">Preview</div>
+        <button id="closePreviewBtn" class="btn" type="button">Close</button>
+      </div>
+      <div class="ccModalBody">
+        <div id="previewContent"></div>
+        <div class="btnRow" style="margin-top:14px; gap:10px; flex-wrap:wrap;">
+          <button id="publishBtn" class="primaryBtn" type="button">Publish listing</button>
+          <button id="keepDraftBtn" class="btn" type="button">Keep as draft</button>
+        </div>
+        <div id="publishMsg" class="note" style="margin-top:10px;"></div>
+      </div>
+    </div>
+  </div>
 
-    <script>
-function $(sel) { return document.querySelector(sel); }
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="supabaseClient.js"></script>
 
-let currentProfileSlug = null;
+  <script>
+    function $(sel) { return document.querySelector(sel); }
 
-function slugify(s) {
-  return String(s || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
+    let currentProfileSlug = null;
 
-// Handle Supabase auth redirects (code flow) and clean up URL once session exists.
-(async function handleAuthRedirect() {
-  try {
-    const url = new URL(window.location.href);
-
-    // Newer flow: ?code=...
-    const code = url.searchParams.get("code");
-    if (code) {
-      const { error } = await window.supabaseClient.auth.exchangeCodeForSession(code);
-      if (error) console.warn("exchangeCodeForSession error:", error);
-      // Remove code from URL
-      url.searchParams.delete("code");
-      window.history.replaceState({}, document.title, url.pathname + url.search);
+    function slugify(s) {
+      return String(s || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
     }
 
-    if (window.location.hash && window.location.hash.includes("access_token")) {
-      const { error } = await window.supabaseClient.auth.getSessionFromUrl();
-      if (error) console.warn("getSessionFromUrl error:", error);
-      window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+    function showModal() {
+      const b = $("#previewBackdrop");
+      b.style.display = "flex";
+      b.setAttribute("aria-hidden", "false");
     }
 
-    // If we have a session, clear any hash fragments (e.g., #access_token=...)
-    const { data } = await window.supabaseClient.auth.getSession();
-    if (data?.session && window.location.hash) {
-      window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
-    }
-  } catch (e) {
-    console.warn("handleAuthRedirect failed:", e);
-  }
-})();
-
-async function getUser() {
-  // getSession is usually fast and avoids a network roundtrip
-  const { data } = await window.supabaseClient.auth.getSession();
-  return data.session?.user || null;
-}
-
-async function refreshUI() {
-  const user = await getUser();
-  const status = $("#authStatus");
-  const signOutBtn = $("#signOutBtn");
-  const form = $("#cosplayerForm");
-
-  if (!user) {
-    currentProfileSlug = null;
-    status.textContent = "Not signed in.";
-    signOutBtn.style.display = "none";
-    form.style.display = "none";
-    return;
-  }
-
-  status.textContent = `Signed in as ${user.email}`;
-  signOutBtn.style.display = "inline-block";
-  form.style.display = "block";
-
-  const { data: rows, error } = await window.supabaseClient
-    .from("cosplayer_profiles")
-    .select("slug,name,location,rate,virtual,in_person,contact")
-    .eq("user_id", user.id)
-    .limit(1);
-
-  if (error) {
-    console.warn("Load profile error:", error);
-    return;
-  }
-
-  const row = rows?.[0];
-  if (!row) {
-    currentProfileSlug = null;
-    return;
-  }
-
-  currentProfileSlug = row.slug || null;
-
-  $("#pName").value = row.name || "";
-  $("#pLocation").value = row.location || "";
-  $("#pRate").value = row.rate ?? 0;
-  $("#pVirtual").checked = !!row.virtual;
-  $("#pInPerson").checked = !!row.in_person;
-
-  const contact = row.contact || {};
-  $("#pContactLink").value =
-    contact.instagram || contact.wechat || contact.xhs || contact.email || "";
-}
-
-$("#sendLinkBtn")?.addEventListener("click", async () => {
-  const email = $("#authEmail").value.trim();
-  if (!email) return alert("Enter your email first.");
-
-const SAFE_REDIRECT = "https://coscommission.com/signup.html";
-  const { error } = await window.supabaseClient.auth.signInWithOtp({
-    email,
-    options: {
-      // On prod this becomes https://coscommission.com/signup.html
-      emailRedirectTo: SAFE_REDIRECT
-    },
-  });
-
-  if (error) return alert(error.message);
-  alert("Magic link sent. Check your email.");
-});
-
-$("#signOutBtn")?.addEventListener("click", async () => {
-  await window.supabaseClient.auth.signOut();
-  location.reload();
-});
-
-$("#cosplayerForm")?.addEventListener("submit", async (ev) => {
-  ev.preventDefault();
-  $("#saveMsg").textContent = "Saving…";
-  console.log("SUBMIT FIRED");
-
-  try {
-    const user = await getUser();
-    if (!user) {
-      $("#saveMsg").textContent = "";
-      return alert("Not signed in. Please request a magic link again.");
+    function hideModal() {
+      const b = $("#previewBackdrop");
+      b.style.display = "none";
+      b.setAttribute("aria-hidden", "true");
+      $("#publishMsg").textContent = "";
     }
 
-    const name = $("#pName").value.trim();
-    const locationTxt = $("#pLocation").value.trim();
-    const rate = Number($("#pRate").value || 0);
-    const virtual = $("#pVirtual").checked;
-    const in_person = $("#pInPerson").checked;
-
-    const contactLink = $("#pContactLink").value.trim();
-
-    if (!name) {
-      $("#saveMsg").textContent = "";
-      return alert("Display name is required.");
-    }
-    if (!virtual && !in_person) {
-      $("#saveMsg").textContent = "";
-      return alert("Select Virtual and/or In-person.");
+    function normalizeContact(link) {
+      const s = (link || "").trim();
+      if (!s) return {};
+      // Keep it simple for beta: store one link under a best-effort key
+      if (s.startsWith("mailto:")) return { email: s };
+      if (s.includes("@") && !s.startsWith("http")) return { email: "mailto:" + s };
+      if (s.includes("xhs") || s.includes("xiaohongshu")) return { xhs: s };
+      if (s.includes("wechat")) return { wechat: s };
+      return { instagram: s };
     }
 
-    // contact is jsonb in DB
-    const contact = {};
-    if (contactLink) {
-      if (contactLink.startsWith("mailto:")) contact.email = contactLink;
-      else contact.instagram = contactLink; // simple default for beta
+    function readFormValues() {
+      const name = $("#pName").value.trim();
+      const locationTxt = $("#pLocation").value.trim();
+      const rate = Number($("#pRate").value || 0);
+      const virtual = $("#pVirtual").checked;
+      const in_person = $("#pInPerson").checked;
+      const contactLink = $("#pContactLink").value.trim();
+      const coverImage = $("#pCoverImage").value.trim();
+
+      return { name, locationTxt, rate, virtual, in_person, contactLink, coverImage };
     }
 
-    // Keep slug stable once created
-    const slug = currentProfileSlug || `${slugify(name)}-${user.id.slice(0, 6)}`;
+    function validateDraft(v) {
+      if (!v.name) return { ok: false, msg: "Display name is required." };
+      if (!v.virtual && !v.in_person) return { ok: false, msg: "Select Virtual and/or In-person." };
+      return { ok: true };
+    }
 
-    const payload = {
-      user_id: user.id,
-      slug,
-      name,
-      rate,
-      virtual,
-      in_person,
-      location: locationTxt,
-      contact,
-      is_demo: false,
-    };
+    function validatePublish(v) {
+      const d = validateDraft(v);
+      if (!d.ok) return d;
+      if (v.in_person && !v.locationTxt) return { ok: false, msg: "Location is required if you offer In-person." };
+      if (!v.contactLink) return { ok: false, msg: "Contact link is required to publish." };
+      if (!v.coverImage) return { ok: false, msg: "Cover photo URL is required to publish." };
+      return { ok: true };
+    }
 
-    console.log("UPSERT payload:", payload);
+    function renderPreview(v, canPublish, publishReason) {
+      const badges = [
+        v.virtual ? `<span class="ccMiniPill">💻 Virtual</span>` : "",
+        v.in_person ? `<span class="ccMiniPill">🌍 In-person${v.locationTxt ? ` · 📍 ${escapeHtml(v.locationTxt)}` : ""}</span>` : ""
+      ].filter(Boolean).join("");
 
-const { error } = await window.supabaseClient
-  .from("cosplayer_profiles")
-  .upsert(payload, { onConflict: "user_id" });
+      const safeImg = v.coverImage ? escapeAttr(v.coverImage) : "images/placeholder.png";
 
-  if (error) {
-    console.warn("UPSERT error:", error);
-    $("#saveMsg").textContent = "Save failed.";
-    return alert(error.message);
-  }
+      const reqs = [
+        { label: "Has name", ok: !!v.name },
+        { label: "Has service type", ok: (v.virtual || v.in_person) },
+        { label: "Has contact", ok: !!v.contactLink },
+        { label: "Has cover photo", ok: !!v.coverImage },
+        { label: "In-person location provided (if needed)", ok: (!v.in_person || !!v.locationTxt) }
+      ];
 
-  currentProfileSlug = slug;
-  $("#saveMsg").textContent = "Saved! Redirecting…";
-  location.href = `profile.html?id=${encodeURIComponent(currentProfileSlug)}`;
+      const reqHtml = reqs.map(r => {
+        const cls = r.ok ? "ccReq ok" : "ccReq bad";
+        const icon = r.ok ? "✅" : "❌";
+        return `<div class="${cls}">${icon} ${escapeHtml(r.label)}</div>`;
+      }).join("");
 
-  } catch (err) {
-    console.error(err);
-    $("#saveMsg").textContent = "";
-    alert(err?.message || String(err));
-  }
-});
+      const publishNote = canPublish
+        ? `<div class="ccReq ok">✅ Ready to publish</div>`
+        : `<div class="ccReq bad">❌ Not publish-ready: ${escapeHtml(publishReason || "Fix the items above")}</div>`;
 
-// Keep UI in sync
-window.supabaseClient.auth.onAuthStateChange(() => refreshUI());
-refreshUI();
-</script>
+      return `
+        <div class="ccPreviewGrid">
+          <img class="ccPreviewImg" src="${safeImg}" alt="Preview image" onerror="this.src='images/placeholder.png'" />
+          <div>
+            <div style="display:flex; align-items:baseline; justify-content:space-between; gap:12px;">
+              <div style="font-size:22px; font-weight:800;">${escapeHtml(v.name || "(No name yet)")}</div>
+              <div style="font-size:18px; opacity:.9;">$${Number.isFinite(v.rate) ? v.rate : 0}/hr</div>
+            </div>
+            <div class="ccMiniRow">${badges || `<span class="ccMiniPill">(Select Virtual / In-person)</span>`}</div>
+            <div style="margin-top:10px; opacity:.85;">
+              <div><strong>Contact:</strong> ${escapeHtml(v.contactLink || "(missing)")}</div>
+              <div><strong>Cover photo:</strong> ${escapeHtml(v.coverImage || "(missing)")}</div>
+            </div>
+            <div style="margin-top:12px;">
+              ${publishNote}
+              <div style="margin-top:10px; display:grid; gap:8px;">${reqHtml}</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    function escapeHtml(s) {
+      return String(s || "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+    }
+    function escapeAttr(s) { return escapeHtml(s).replace(/\s/g, "%20"); }
+
+    // Handle Supabase auth redirects (code flow) and clean up URL once session exists.
+    (async function handleAuthRedirect() {
+      try {
+        const url = new URL(window.location.href);
+
+        // Newer flow: ?code=...
+        const code = url.searchParams.get("code");
+        if (code) {
+          const { error } = await window.supabaseClient.auth.exchangeCodeForSession(code);
+          if (error) console.warn("exchangeCodeForSession error:", error);
+          url.searchParams.delete("code");
+          window.history.replaceState({}, document.title, url.pathname + url.search);
+        }
+
+        if (window.location.hash && window.location.hash.includes("access_token")) {
+          const { error } = await window.supabaseClient.auth.getSessionFromUrl();
+          if (error) console.warn("getSessionFromUrl error:", error);
+          window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+        }
+
+        const { data } = await window.supabaseClient.auth.getSession();
+        if (data?.session && window.location.hash) {
+          window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+        }
+      } catch (e) {
+        console.warn("handleAuthRedirect failed:", e);
+      }
+    })();
+
+    async function getUser() {
+      const { data } = await window.supabaseClient.auth.getSession();
+      return data.session?.user || null;
+    }
+
+    async function refreshUI() {
+      const user = await getUser();
+      const status = $("#authStatus");
+      const signOutBtn = $("#signOutBtn");
+      const form = $("#cosplayerForm");
+
+      if (!user) {
+        currentProfileSlug = null;
+        status.textContent = "Not signed in.";
+        signOutBtn.style.display = "none";
+        form.style.display = "none";
+        return;
+      }
+
+      status.textContent = `Signed in as ${user.email}`;
+      signOutBtn.style.display = "inline-block";
+      form.style.display = "block";
+
+      const { data: rows, error } = await window.supabaseClient
+        .from("cosplayer_profiles")
+        .select("slug,name,location,rate,virtual,in_person,contact,cover_image,is_published")
+        .eq("user_id", user.id)
+        .limit(1);
+
+      if (error) {
+        console.warn("Load profile error:", error);
+        return;
+      }
+
+      const row = rows?.[0];
+      if (!row) {
+        currentProfileSlug = null;
+        return;
+      }
+
+      currentProfileSlug = row.slug || null;
+
+      $("#pName").value = row.name || "";
+      $("#pLocation").value = row.location || "";
+      $("#pRate").value = row.rate ?? 0;
+      $("#pVirtual").checked = !!row.virtual;
+      $("#pInPerson").checked = !!row.in_person;
+      $("#pCoverImage").value = row.cover_image || "";
+
+      const contact = row.contact || {};
+      $("#pContactLink").value =
+        contact.instagram || contact.wechat || contact.xhs || contact.email || "";
+
+      // Tiny hint to user if they are already published
+      if (row.is_published) {
+        $("#saveMsg").textContent = "Your listing is currently published. You can update fields and publish again to refresh.";
+      }
+    }
+
+    $("#sendLinkBtn")?.addEventListener("click", async () => {
+      const email = $("#authEmail").value.trim();
+      if (!email) return alert("Enter your email first.");
+
+      const SAFE_REDIRECT = "https://coscommission.com/signup.html";
+      const { error } = await window.supabaseClient.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: SAFE_REDIRECT },
+      });
+
+      if (error) return alert(error.message);
+      alert("Magic link sent. Check your email.");
+    });
+
+    $("#signOutBtn")?.addEventListener("click", async () => {
+      await window.supabaseClient.auth.signOut();
+      location.reload();
+    });
+
+    $("#closePreviewBtn")?.addEventListener("click", hideModal);
+    $("#keepDraftBtn")?.addEventListener("click", hideModal);
+    $("#previewBackdrop")?.addEventListener("click", (e) => {
+      if (e.target?.id === "previewBackdrop") hideModal();
+    });
+
+    async function upsertProfile({ is_published }) {
+      const user = await getUser();
+      if (!user) throw new Error("Not signed in. Please request a magic link again.");
+
+      const v = readFormValues();
+
+      // Keep slug stable once created
+      const slug = currentProfileSlug || `${slugify(v.name)}-${user.id.slice(0, 6)}`;
+
+      const payload = {
+        user_id: user.id,
+        slug,
+        name: v.name,
+        rate: v.rate,
+        virtual: v.virtual,
+        in_person: v.in_person,
+        location: v.locationTxt,
+        contact: normalizeContact(v.contactLink),
+        cover_image: v.coverImage,
+        is_published: !!is_published,
+        is_demo: false,
+      };
+
+      const { error } = await window.supabaseClient
+        .from("cosplayer_profiles")
+        .upsert(payload, { onConflict: "user_id" });
+
+      if (error) throw error;
+
+      currentProfileSlug = slug;
+      return slug;
+    }
+
+    $("#saveDraftBtn")?.addEventListener("click", async () => {
+      $("#saveMsg").textContent = "Saving draft…";
+      try {
+        const v = readFormValues();
+        const d = validateDraft(v);
+        if (!d.ok) {
+          $("#saveMsg").textContent = "";
+          return alert(d.msg);
+        }
+        await upsertProfile({ is_published: false });
+        $("#saveMsg").textContent = "Draft saved. It will NOT appear in Browse until you publish.";
+      } catch (err) {
+        console.error(err);
+        $("#saveMsg").textContent = "";
+        alert(err?.message || String(err));
+      }
+    });
+
+    $("#previewBtn")?.addEventListener("click", async () => {
+      // Save draft first (so preview matches DB + slug exists), then show preview
+      $("#saveMsg").textContent = "Saving draft for preview…";
+      try {
+        const v = readFormValues();
+        const d = validateDraft(v);
+        if (!d.ok) {
+          $("#saveMsg").textContent = "";
+          return alert(d.msg);
+        }
+        await upsertProfile({ is_published: false });
+        $("#saveMsg").textContent = "Draft saved.";
+
+        const p = validatePublish(v);
+        const canPublish = !!p.ok;
+        $("#previewContent").innerHTML = renderPreview(v, canPublish, p.ok ? "" : p.msg);
+        $("#publishBtn").disabled = !canPublish;
+
+        showModal();
+      } catch (err) {
+        console.error(err);
+        $("#saveMsg").textContent = "";
+        alert(err?.message || String(err));
+      }
+    });
+
+    $("#publishBtn")?.addEventListener("click", async () => {
+      $("#publishMsg").textContent = "Publishing…";
+      try {
+        const v = readFormValues();
+        const p = validatePublish(v);
+        if (!p.ok) {
+          $("#publishMsg").textContent = "";
+          return alert(p.msg);
+        }
+
+        const slug = await upsertProfile({ is_published: true });
+        $("#publishMsg").textContent = "Published! Redirecting…";
+        location.href = `profile.html?id=${encodeURIComponent(slug)}`;
+      } catch (err) {
+        console.error(err);
+        $("#publishMsg").textContent = "";
+        alert(err?.message || String(err));
+      }
+    });
+
+    // Keep UI in sync
+    window.supabaseClient.auth.onAuthStateChange(() => refreshUI());
+    refreshUI();
+  </script>
 
 </body>
 </html>

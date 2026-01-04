@@ -8,6 +8,8 @@ async function fetchCosplayersFromDB() {
   const { data, error } = await window.supabaseClient
     .from("cosplayer_profiles")
     .select("*")
+    // Only show real listings once they're published; always allow demo rows.
+    .or("is_demo.eq.true,is_published.eq.true")
     .order("created_at", { ascending: false });
 
   if (error) {

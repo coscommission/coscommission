@@ -256,9 +256,9 @@
           window.history.replaceState({}, document.title, url.pathname + url.search);
         }
 
+        // Old implicit flow sometimes returns #access_token=...
+        // Supabase v2 + detectSessionInUrl handles it. We only clean the URL.
         if (window.location.hash && window.location.hash.includes("access_token")) {
-          const { error } = await window.supabaseClient.auth.getSessionFromUrl({ storeSession: true });
-          if (error) console.warn("getSessionFromUrl error:", error);
           window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
         }
 
@@ -363,6 +363,10 @@
 
       // Keep slug stable once created
       const slug = currentProfileSlug || `${slugify(v.name)}-${user.id.slice(0, 6)}`;
+
+      const { data: s } = await window.supabaseClient.auth.getSession();
+      console.log("session?", s?.session ? "YES" : "NO", s?.session?.expires_at);
+
 
       const payload = {
         user_id: user.id,

@@ -7,6 +7,7 @@ window.supabaseClient = supabase.createClient(
   SUPABASE_ANON_KEY,
   {
     auth: {
+      flowType: "pkce",
       detectSessionInUrl: true,
       persistSession: true,
       autoRefreshToken: true,

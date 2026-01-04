@@ -424,3 +424,79 @@ p { opacity: 0.9; line-height: 1.5; }
   color: rgba(255,255,255,0.75);
   font-size: 15px;
 }
+
+/* Signup cosplayer portal polish */
+.panel h2 { margin-top: 0; }
+
+.panel input[type="email"],
+.panel input[type="text"],
+.panel input[type="number"]{
+  padding:12px 12px;
+  border-radius:12px;
+  border:1px solid #233044;
+  background:#0f141c;
+  color:#e9eef5;
+  outline:none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.panel input::placeholder { color: rgba(233,238,245,0.55); }
+
+/* --- Button states: idle / hover / active --- */
+.search button,
+.filters button,
+.btn,
+.primaryBtn,
+.ghostBtn {
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.05s ease, box-shadow 0.15s ease;
+}
+
+/* Default (idle) — lighter + raised */
+.search button,
+.filters button,
+.btn,
+.primaryBtn,
+.ghostBtn {
+  background: linear-gradient(180deg, #243044, #151d2b);
+  border-color: #2b3f5c;
+  box-shadow: 0 8px 18px rgba(0,0,0,0.35);
+}
+
+/* Hover — slightly brighter */
+.search button:hover,
+.filters button:hover,
+.btn:hover,
+.primaryBtn:hover,
+.ghostBtn:hover {
+  background: linear-gradient(180deg, #2b3a52, #182235);
+  box-shadow: 0 10px 22px rgba(0,0,0,0.45);
+}
+
+/* Active (clicked) — darker + pressed */
+.search button:active,
+.filters button:active,
+.btn:active,
+.primaryBtn:active,
+.ghostBtn:active {
+  background: linear-gradient(180deg, #0b1220, #020617);
+  box-shadow: inset 0 4px 10px rgba(0,0,0,0.6);
+  transform: translateY(1px);
+}
+
+/* Disabled — clearly disabled, not “pressed” */
+button:disabled,
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Form buttons should look calmer than hero CTAs */
+.formBtn {
+  font-weight: 500;        /* not bold */
+  font-size: 0.95rem;      /* slightly smaller */
+  letter-spacing: 0.01em;  /* relaxed */
+  padding: 10px 14px;      /* less chunky */
+}

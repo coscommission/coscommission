@@ -29,11 +29,262 @@
         Sign up for early access
         </a>
     </div>
+    <hr style="margin: 28px 0; border: none; border-top: 1px solid #1b2330;" />
+
+    <section class="panel">
+      <h2>Cosplayer beta (Create your profile)</h2>
+      <p class="note">
+        This creates a real listing in the beta database. Only you can edit your own profile.
+      </p>
+
+      <!-- Auth -->
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px;">
+        <input id="authEmail" type="email" placeholder="Email for magic link" style="flex:1; min-width:240px;" />
+        <button class="primaryBtn formBtn" id="sendLinkBtn" type="button">
+          Send login link
+        </button>
+        <button class="btn" id="signOutBtn" type="button" style="display:none;">Sign out</button>
+      </div>
+
+      <div id="authStatus" class="note" style="margin-top:10px;">
+        Not signed in.
+      </div>
+
+      <!-- Profile Form -->
+      <form id="cosplayerForm" style="margin-top:16px; display:none;">
+        <div class="note" style="margin-bottom:10px;">
+          Tip: Start simple. You can add portfolio uploads later.
+        </div>
+
+        <div class="filters" style="margin:0;">
+          <input id="pName" type="text" placeholder="Display name" required />
+          <input id="pLocation" type="text" placeholder="City (e.g., Toronto)" />
+          <input id="pRate" type="number" min="0" step="1" placeholder="Rate ($/hr)" required />
+        </div>
+
+        <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
+          <label class="chip"><input id="pVirtual" type="checkbox" /> Virtual</label>
+          <label class="chip"><input id="pInPerson" type="checkbox" /> In-person</label>
+        </div>
+
+        <div class="note" style="margin-top:10px;">
+          Contact link (Instagram, XHS, WeChat link, email mailto:, etc.)
+        </div>
+        <input id="pContactLink" type="text" placeholder="https://instagram.com/yourhandle" />
+
+        <div class="btnRow" style="margin-top:14px;">
+          <button id="saveProfileBtn" class="primaryBtn" type="submit" form="cosplayerForm">
+            Save my profile
+          </button>
+        </div>
+
+        <div id="saveMsg" class="note" style="margin-top:10px;"></div>
+      </form>
+    </section>
 
     <div class="note" style="margin-top:14px;">
         Safety reminder: Cosplayers are never required to meet outside public spaces or allow physical contact. Decline or block anyone who makes you uncomfortable.
     </div>
     </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabaseClient.js"></script>
+
+    <script>
+function $(sel) { return document.querySelector(sel); }
+
+let currentProfileSlug = null;
+
+function slugify(s) {
+  return String(s || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+// Handle Supabase auth redirects (code flow) and clean up URL once session exists.
+(async function handleAuthRedirect() {
+  try {
+    const url = new URL(window.location.href);
+
+    // Newer flow: ?code=...
+    const code = url.searchParams.get("code");
+    if (code) {
+      const { error } = await window.supabaseClient.auth.exchangeCodeForSession(code);
+      if (error) console.warn("exchangeCodeForSession error:", error);
+      // Remove code from URL
+      url.searchParams.delete("code");
+      window.history.replaceState({}, document.title, url.pathname + url.search);
+    }
+
+    // If we have a session, clear any hash fragments (e.g., #access_token=...)
+    const { data } = await window.supabaseClient.auth.getSession();
+    if (data?.session && window.location.hash) {
+      window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+    }
+  } catch (e) {
+    console.warn("handleAuthRedirect failed:", e);
+  }
+})();
+
+async function getUser() {
+  // getSession is usually fast and avoids a network roundtrip
+  const { data } = await window.supabaseClient.auth.getSession();
+  return data.session?.user || null;
+}
+
+async function refreshUI() {
+  const user = await getUser();
+  const status = $("#authStatus");
+  const signOutBtn = $("#signOutBtn");
+  const form = $("#cosplayerForm");
+
+  if (!user) {
+    currentProfileSlug = null;
+    status.textContent = "Not signed in.";
+    signOutBtn.style.display = "none";
+    form.style.display = "none";
+    return;
+  }
+
+  status.textContent = `Signed in as ${user.email}`;
+  signOutBtn.style.display = "inline-block";
+  form.style.display = "block";
+
+  const { data: rows, error } = await window.supabaseClient
+    .from("cosplayer_profiles")
+    .select("slug,name,location,rate,virtual,in_person,contact")
+    .eq("user_id", user.id)
+    .limit(1);
+
+  if (error) {
+    console.warn("Load profile error:", error);
+    return;
+  }
+
+  const row = rows?.[0];
+  if (!row) {
+    currentProfileSlug = null;
+    return;
+  }
+
+  currentProfileSlug = row.slug || null;
+
+  $("#pName").value = row.name || "";
+  $("#pLocation").value = row.location || "";
+  $("#pRate").value = row.rate ?? 0;
+  $("#pVirtual").checked = !!row.virtual;
+  $("#pInPerson").checked = !!row.in_person;
+
+  const contact = row.contact || {};
+  $("#pContactLink").value =
+    contact.instagram || contact.wechat || contact.xhs || contact.email || "";
+}
+
+$("#sendLinkBtn")?.addEventListener("click", async () => {
+  const email = $("#authEmail").value.trim();
+  if (!email) return alert("Enter your email first.");
+
+  const { error } = await window.supabaseClient.auth.signInWithOtp({
+    email,
+    options: {
+      // On prod this becomes https://coscommission.com/signup.html
+      emailRedirectTo: `https://coscommission.com/signup.html`,
+    },
+  });
+
+  if (error) return alert(error.message);
+  alert("Magic link sent. Check your email.");
+});
+
+$("#signOutBtn")?.addEventListener("click", async () => {
+  await window.supabaseClient.auth.signOut();
+  location.reload();
+});
+
+$("#cosplayerForm")?.addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  $("#saveMsg").textContent = "Saving…";
+  console.log("SUBMIT FIRED");
+
+  try {
+    const user = await getUser();
+    if (!user) {
+      $("#saveMsg").textContent = "";
+      return alert("Not signed in. Please request a magic link again.");
+    }
+
+    const name = $("#pName").value.trim();
+    const locationTxt = $("#pLocation").value.trim();
+    const rate = Number($("#pRate").value || 0);
+    const virtual = $("#pVirtual").checked;
+    const in_person = $("#pInPerson").checked;
+
+    const contactLink = $("#pContactLink").value.trim();
+
+    if (!name) {
+      $("#saveMsg").textContent = "";
+      return alert("Display name is required.");
+    }
+    if (!virtual && !in_person) {
+      $("#saveMsg").textContent = "";
+      return alert("Select Virtual and/or In-person.");
+    }
+
+    // contact is jsonb in DB
+    const contact = {};
+    if (contactLink) {
+      if (contactLink.startsWith("mailto:")) contact.email = contactLink;
+      else contact.instagram = contactLink; // simple default for beta
+    }
+
+    // Keep slug stable once created
+    const slug = currentProfileSlug || `${slugify(name)}-${user.id.slice(0, 6)}`;
+
+    const payload = {
+      user_id: user.id,
+      slug,
+      name,
+      rate,
+      virtual,
+      in_person,
+      location: locationTxt,
+      contact,
+      is_demo: false,
+    };
+
+    console.log("UPSERT payload:", payload);
+
+    const res = await window.supabaseClient
+      .from("cosplayer_profiles")
+      .upsert(payload, { onConflict: "user_id" })
+      .select("slug")
+      .single();
+
+    console.log("UPSERT RESULT:", res);
+
+    if (res.error) {
+      $("#saveMsg").textContent = "Save failed (see console).";
+      return alert(res.error.message);
+    }
+
+    currentProfileSlug = res.data?.slug || slug;
+    $("#saveMsg").textContent = "Saved! Redirecting…";
+
+    // redirect to profile page
+    location.href = `profile.html?id=${encodeURIComponent(currentProfileSlug)}`;
+  } catch (err) {
+    console.error(err);
+    $("#saveMsg").textContent = "";
+    alert(err?.message || String(err));
+  }
+});
+
+// Keep UI in sync
+window.supabaseClient.auth.onAuthStateChange(() => refreshUI());
+refreshUI();
+</script>
 
 </body>
 </html>

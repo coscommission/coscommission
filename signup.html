@@ -243,14 +243,14 @@
     function escapeAttr(s) { return escapeHtml(s).replace(/\s/g, "%20"); }
 
     // Handle Supabase auth redirects (code flow) and clean up URL once session exists.
-    (async function handleAuthRedirect() {
+    (async function async function handleAuthRedirect() {
       try {
         const url = new URL(window.location.href);
 
         // Newer flow: ?code=...
         const code = url.searchParams.get("code");
         if (code) {
-          const { error } = await window.supabaseClient.auth.exchangeCodeForSession(code);
+          const { data, error } = await window.supabaseClient.auth.exchangeCodeForSession(code);
           if (error) console.warn("exchangeCodeForSession error:", error);
           url.searchParams.delete("code");
           window.history.replaceState({}, document.title, url.pathname + url.search);

@@ -257,7 +257,7 @@
         }
 
         if (window.location.hash && window.location.hash.includes("access_token")) {
-          const { error } = await window.supabaseClient.auth.getSessionFromUrl();
+          const { error } = await window.supabaseClient.auth.getSessionFromUrl({ storeSession: true });
           if (error) console.warn("getSessionFromUrl error:", error);
           window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
         }

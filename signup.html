@@ -263,24 +263,20 @@ $("#cosplayerForm")?.addEventListener("submit", async (ev) => {
 
     console.log("UPSERT payload:", payload);
 
-    const res = await window.supabaseClient
-      .from("cosplayer_profiles")
-      .upsert(payload, { onConflict: "user_id" })
-      .select("slug")
-      .single();
+const { error } = await window.supabaseClient
+  .from("cosplayer_profiles")
+  .upsert(payload, { onConflict: "user_id" });
 
-    console.log("UPSERT RESULT:", res);
+  if (error) {
+    console.warn("UPSERT error:", error);
+    $("#saveMsg").textContent = "Save failed.";
+    return alert(error.message);
+  }
 
-    if (res.error) {
-      $("#saveMsg").textContent = "Save failed (see console).";
-      return alert(res.error.message);
-    }
+  currentProfileSlug = slug;
+  $("#saveMsg").textContent = "Saved! Redirecting…";
+  location.href = `profile.html?id=${encodeURIComponent(currentProfileSlug)}`;
 
-    currentProfileSlug = res.data?.slug || slug;
-    $("#saveMsg").textContent = "Saved! Redirecting…";
-
-    // redirect to profile page
-    location.href = `profile.html?id=${encodeURIComponent(currentProfileSlug)}`;
   } catch (err) {
     console.error(err);
     $("#saveMsg").textContent = "";

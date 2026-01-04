@@ -118,6 +118,12 @@ function slugify(s) {
       window.history.replaceState({}, document.title, url.pathname + url.search);
     }
 
+    if (window.location.hash && window.location.hash.includes("access_token")) {
+      const { error } = await window.supabaseClient.auth.getSessionFromUrl();
+      if (error) console.warn("getSessionFromUrl error:", error);
+      window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+    }
+
     // If we have a session, clear any hash fragments (e.g., #access_token=...)
     const { data } = await window.supabaseClient.auth.getSession();
     if (data?.session && window.location.hash) {
@@ -186,11 +192,12 @@ $("#sendLinkBtn")?.addEventListener("click", async () => {
   const email = $("#authEmail").value.trim();
   if (!email) return alert("Enter your email first.");
 
+const SAFE_REDIRECT = "https://coscommission.com/signup.html";
   const { error } = await window.supabaseClient.auth.signInWithOtp({
     email,
     options: {
       // On prod this becomes https://coscommission.com/signup.html
-      emailRedirectTo: `https://coscommission.com/signup.html`,
+      emailRedirectTo: SAFE_REDIRECT
     },
   });
 

@@ -65,6 +65,7 @@
       </div>
 
       <div id="authStatus" class="note" style="margin-top:10px;">Not signed in.</div>
+      <div id="authDebug" class="note" style="margin-top:8px; opacity:0.85;"></div>
 
       <!-- Profile Form -->
       <form id="cosplayerForm" style="margin-top:16px; display:none;">
@@ -245,6 +246,7 @@
     // Handle Supabase auth redirects (code flow) and clean up URL once session exists.
    // Handle Supabase auth redirects (PKCE code flow) + show real errors.
     // IMPORTANT: only remove ?code=... after exchange succeeds.
+    // Handle Supabase auth redirects (PKCE) with TIMEOUT + DEBUG + double-run guard.
     (async function handleAuthRedirect() {
       const statusEl = document.querySelector("#authStatus");
 
@@ -252,7 +254,15 @@
         if (statusEl) statusEl.textContent = msg;
       }
 
-      // Small helper: sometimes session lands a beat later.
+      function setDebug(msg) {
+        const el = document.querySelector("#authDebug");
+        if (el) el.textContent = msg;
+      }
+
+      // Prevent double-exchange if this script runs twice for any reason.
+      if (window.__CC_EXCHANGING__) return;
+      window.__CC_EXCHANGING__ = true;
+
       async function getSessionWithRetry(retries = 3, delayMs = 250) {
         for (let i = 0; i < retries; i++) {
           const { data, error } = await window.supabaseClient.auth.getSession();
@@ -263,31 +273,59 @@
         return { data: { session: null }, error: null };
       }
 
+      // Wrap a promise with a timeout so we never hang forever.
+      async function withTimeout(promise, ms, label = "operation") {
+        const controller = new AbortController();
+        const t = setTimeout(() => controller.abort(), ms);
+
+        try {
+          // supabase-js doesn't accept our signal directly here, but aborting still helps in some browsers;
+          // regardless, we enforce timeout at app level.
+          const result = await Promise.race([
+            promise,
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+            ),
+          ]);
+          return result;
+        } finally {
+          clearTimeout(t);
+        }
+      }
+
       try {
         const url = new URL(window.location.href);
         const code = url.searchParams.get("code");
 
+        setDebug(`href has code? ${code ? "YES" : "NO"} | hash: ${window.location.hash ? "YES" : "NO"}`);
+
         if (code) {
           setStatus("Completing login…");
+          setDebug(`Exchanging code=${code.slice(0, 8)}…`);
 
-          const { data, error } = await window.supabaseClient.auth.exchangeCodeForSession(code);
+          const started = Date.now();
+          const { data, error } = await withTimeout(
+            window.supabaseClient.auth.exchangeCodeForSession(code),
+            8000,
+            "exchangeCodeForSession"
+          );
+
+          const elapsed = Date.now() - started;
+          setDebug(`Exchange returned in ${elapsed}ms`);
 
           if (error) {
             console.warn("exchangeCodeForSession error:", error);
-            // DO NOT delete the code on failure. Keeps it debuggable and lets you retry.
             setStatus(`Login failed: ${error.message}`);
+            // DO NOT delete ?code=... if exchange failed.
             return;
           }
 
-          // Exchange succeeded. Now we can clean the URL.
+          // Success: now safe to clean URL.
           url.searchParams.delete("code");
           window.history.replaceState({}, document.title, url.pathname + url.search);
         }
 
-        // Handle legacy hash tokens (rare on v2 PKCE, but safe)
-        // Only remove hash if we confirm a session exists.
         const { data: sData, error: sErr } = await getSessionWithRetry();
-
         if (sErr) {
           console.warn("getSession error:", sErr);
           setStatus(`Session check failed: ${sErr.message}`);
@@ -295,27 +333,25 @@
         }
 
         if (sData?.session) {
-          // Safe to clean hash now
+          setStatus("Signed in. Loading…");
+          setDebug(`Session YES exp=${sData.session.expires_at || "(no exp)"}`);
+
+          // Clean legacy hash only after session exists
           if (window.location.hash && window.location.hash.includes("access_token")) {
             window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
           }
-          // Let your existing refreshUI() drive the final UI state
-          // (refreshUI is defined later in your script; calling it here is optional)
-          setStatus("Signed in. Loading…");
         } else {
-          // No session. If user just arrived from a magic link, this message is crucial.
-          if (code) {
-            // We shouldn't reach this often because code block above returns on exchange failure.
-            setStatus("Login did not complete. Please try the newest link again.");
-          } else {
-            setStatus("Not signed in.");
-          }
+          setStatus("Not signed in.");
+          setDebug("Session NO after redirect handling.");
         }
       } catch (e) {
         console.warn("handleAuthRedirect failed:", e);
-        setStatus("Login redirect failed. Please try requesting a new link.");
+        setStatus(`Login redirect failed: ${e.message || e}`);
+      } finally {
+        window.__CC_EXCHANGING__ = false;
       }
     })();
+
 
 
 

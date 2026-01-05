@@ -56,13 +56,43 @@
       </p>
 
       <!-- Auth -->
-      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-top:12px;">
-        <input id="authEmail" type="email" placeholder="Email for magic link" style="flex:1; min-width:240px;" />
-        <button class="primaryBtn formBtn" id="sendLinkBtn" type="button">
-          Send login link
-        </button>
-        <button class="btn" id="signOutBtn" type="button" style="display:none;">Sign out</button>
+      <div class="note" style="margin-top:12px;">
+        Choose a sign-in method
       </div>
+
+      <div class="btnRow" style="margin-top:8px; gap:10px; flex-wrap:wrap;">
+        <button class="primaryBtn" id="googleBtn" type="button">
+          Continue with Google
+        </button>
+        <button class="ghostBtn" id="emailToggleBtn" type="button">
+          Continue with Email
+        </button>
+      </div>
+
+    <div class="note" style="margin-top:8px; color:#f0c36d;">
+      ⚠️ During beta, email sign-in may not work for everyone.  
+      Google sign-in is recommended.
+    </div>
+
+
+      <div id="emailAuthBox" style="display:none; margin-top:12px;">
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+          <input
+            id="authEmail"
+            type="email"
+            placeholder="Enter your email for a login link"
+            style="flex:1; min-width:240px;"
+          />
+          <button class="btn" id="sendLinkBtn" type="button">
+            Send login link
+          </button>
+        </div>
+      </div>
+
+      <button class="btn" id="signOutBtn" type="button" style="display:none; margin-top:10px;">
+        Sign out
+      </button>
+
 
       <div id="authStatus" class="note" style="margin-top:10px;">Not signed in.</div>
       <div id="authDebug" class="note" style="margin-top:8px; opacity:0.85;"></div>
@@ -243,115 +273,26 @@
     }
     function escapeAttr(s) { return escapeHtml(s).replace(/\s/g, "%20"); }
 
-    // Handle Supabase auth redirects (code flow) and clean up URL once session exists.
-   // Handle Supabase auth redirects (PKCE code flow) + show real errors.
-    // IMPORTANT: only remove ?code=... after exchange succeeds.
-    // Handle Supabase auth redirects (PKCE) with TIMEOUT + DEBUG + double-run guard.
-    (async function handleAuthRedirect() {
-      const statusEl = document.querySelector("#authStatus");
+function setDebug(msg) { const el = $("#authDebug"); if (el) el.textContent = msg; }
 
-      function setStatus(msg) {
-        if (statusEl) statusEl.textContent = msg;
+(async function handleAuthRedirect() {
+  try {
+    const { data, error } = await window.supabaseClient.auth.getSession();
+    if (error) console.warn("getSession error:", error);
+
+    setDebug(`Session: ${data?.session ? "YES" : "NO"}`);
+
+    if (data?.session) {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get("code") || window.location.hash) {
+        window.history.replaceState({}, document.title, url.pathname);
       }
-
-      function setDebug(msg) {
-        const el = document.querySelector("#authDebug");
-        if (el) el.textContent = msg;
-      }
-
-      // Prevent double-exchange if this script runs twice for any reason.
-      if (window.__CC_EXCHANGING__) return;
-      window.__CC_EXCHANGING__ = true;
-
-      async function getSessionWithRetry(retries = 3, delayMs = 250) {
-        for (let i = 0; i < retries; i++) {
-          const { data, error } = await window.supabaseClient.auth.getSession();
-          if (error) return { data: null, error };
-          if (data?.session) return { data, error: null };
-          if (i < retries - 1) await new Promise(r => setTimeout(r, delayMs));
-        }
-        return { data: { session: null }, error: null };
-      }
-
-      // Wrap a promise with a timeout so we never hang forever.
-      async function withTimeout(promise, ms, label = "operation") {
-        const controller = new AbortController();
-        const t = setTimeout(() => controller.abort(), ms);
-
-        try {
-          // supabase-js doesn't accept our signal directly here, but aborting still helps in some browsers;
-          // regardless, we enforce timeout at app level.
-          const result = await Promise.race([
-            promise,
-            new Promise((_, reject) =>
-              setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
-            ),
-          ]);
-          return result;
-        } finally {
-          clearTimeout(t);
-        }
-      }
-
-      try {
-        const url = new URL(window.location.href);
-        const code = url.searchParams.get("code");
-
-        setDebug(`href has code? ${code ? "YES" : "NO"} | hash: ${window.location.hash ? "YES" : "NO"}`);
-
-        if (code) {
-          setStatus("Completing login…");
-          setDebug(`Exchanging code=${code.slice(0, 8)}…`);
-
-          const started = Date.now();
-          const { data, error } = await withTimeout(
-            window.supabaseClient.auth.exchangeCodeForSession(code),
-            8000,
-            "exchangeCodeForSession"
-          );
-
-          const elapsed = Date.now() - started;
-          setDebug(`Exchange returned in ${elapsed}ms`);
-
-          if (error) {
-            console.warn("exchangeCodeForSession error:", error);
-            setStatus(`Login failed: ${error.message}`);
-            // DO NOT delete ?code=... if exchange failed.
-            return;
-          }
-
-          // Success: now safe to clean URL.
-          url.searchParams.delete("code");
-          window.history.replaceState({}, document.title, url.pathname + url.search);
-        }
-
-        const { data: sData, error: sErr } = await getSessionWithRetry();
-        if (sErr) {
-          console.warn("getSession error:", sErr);
-          setStatus(`Session check failed: ${sErr.message}`);
-          return;
-        }
-
-        if (sData?.session) {
-          setStatus("Signed in. Loading…");
-          setDebug(`Session YES exp=${sData.session.expires_at || "(no exp)"}`);
-
-          // Clean legacy hash only after session exists
-          if (window.location.hash && window.location.hash.includes("access_token")) {
-            window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
-          }
-        } else {
-          setStatus("Not signed in.");
-          setDebug("Session NO after redirect handling.");
-        }
-      } catch (e) {
-        console.warn("handleAuthRedirect failed:", e);
-        setStatus(`Login redirect failed: ${e.message || e}`);
-      } finally {
-        window.__CC_EXCHANGING__ = false;
-      }
-    })();
-
+    }
+  } catch (e) {
+    console.warn("handleAuthRedirect failed:", e);
+    setDebug(`Redirect handler error: ${e?.message || e}`);
+  }
+})();
 
 
 
@@ -373,6 +314,9 @@
         form.style.display = "none";
         return;
       }
+      $("#emailAuthBox").style.display = "none";
+      $("#emailToggleBtn").style.display = "none";
+      $("#googleBtn").style.display = "none";
 
       status.textContent = `Signed in as ${user.email}`;
       signOutBtn.style.display = "inline-block";
@@ -426,6 +370,19 @@
 
       if (error) return alert(error.message);
       alert("Magic link sent. Check your email.");
+    });
+
+    $("#googleBtn")?.addEventListener("click", async () => {
+    const { error } = await window.supabaseClient.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: "https://coscommission.com/signup.html" },
+    });
+      if (error) alert(error.message);
+    });
+
+    $("#emailToggleBtn")?.addEventListener("click", () => {
+      $("#emailAuthBox").style.display = "block";
+      $("#authEmail")?.focus();
     });
 
     $("#signOutBtn")?.addEventListener("click", async () => {

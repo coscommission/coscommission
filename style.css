@@ -443,6 +443,56 @@ p { opacity: 0.9; line-height: 1.5; }
 
 .panel input::placeholder { color: rgba(233,238,245,0.55); }
 
+/* ===== Button normalization (fix native <button> styles) ===== */
+button.btn,
+button.primaryBtn,
+button.ghostBtn,
+a.btn,
+a.primaryBtn,
+a.ghostBtn {
+  -webkit-appearance: none;
+  appearance: none;
+  font: inherit;
+  color: #e9eef5;              /* force readable text */
+  background: none;            /* we'll set below */
+  border: 1px solid #233044;
+  border-radius: 16px;
+  line-height: 1;
+}
+
+/* Make .btn / .primaryBtn consistent sizing */
+.btn,
+.primaryBtn,
+.ghostBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px 18px;
+  min-height: 44px;            /* fixes inconsistent heights */
+  white-space: nowrap;
+}
+
+/* Primary vs secondary */
+.primaryBtn {
+  border-color: #2b3f5c;
+  background: linear-gradient(180deg, rgba(62,125,255,0.25), rgba(62,125,255,0.10));
+  font-weight: 600;
+}
+
+.btn {
+  border-color: #233044;
+  background: linear-gradient(180deg, #243044, #151d2b);
+  font-weight: 600;
+}
+
+.ghostBtn {
+  border-color: #233044;
+  background: #0f141c;
+  color: #cfd8e3;
+}
+
+
 /* --- Button states: idle / hover / active --- */
 .search button,
 .filters button,

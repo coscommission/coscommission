@@ -247,29 +247,36 @@
       try {
         const url = new URL(window.location.href);
 
-        // Newer flow: ?code=...
+        // PKCE: ?code=...
         const code = url.searchParams.get("code");
         if (code) {
-          const { data, error } = await window.supabaseClient.auth.exchangeCodeForSession(code);
+          const { error } = await window.supabaseClient.auth.exchangeCodeForSession(code);
           if (error) console.warn("exchangeCodeForSession error:", error);
+
           url.searchParams.delete("code");
           window.history.replaceState({}, document.title, url.pathname + url.search);
         }
 
-        // Old implicit flow sometimes returns #access_token=...
-        // Supabase v2 + detectSessionInUrl handles it. We only clean the URL.
-        if (window.location.hash && window.location.hash.includes("access_token")) {
-          window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
-        }
-
+        // IMPORTANT: do NOT wipe hash until we confirm session exists
         const { data } = await window.supabaseClient.auth.getSession();
-        if (data?.session && window.location.hash) {
-          window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+
+        if (data?.session) {
+          // now it's safe to clean up any #access_token stuff
+          if (window.location.hash && window.location.hash.includes("access_token")) {
+            window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+          }
+        } else {
+          // If we got here with access_token in hash but no session, DON'T delete the hash.
+          // That preserves info for supabase-js to parse.
+          if (window.location.hash && window.location.hash.includes("access_token")) {
+            console.warn("Hash token present but session not set yet. Leaving hash intact.");
+          }
         }
       } catch (e) {
         console.warn("handleAuthRedirect failed:", e);
       }
     })();
+
 
     async function getUser() {
       const { data } = await window.supabaseClient.auth.getSession();

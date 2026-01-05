@@ -243,39 +243,80 @@
     function escapeAttr(s) { return escapeHtml(s).replace(/\s/g, "%20"); }
 
     // Handle Supabase auth redirects (code flow) and clean up URL once session exists.
+   // Handle Supabase auth redirects (PKCE code flow) + show real errors.
+    // IMPORTANT: only remove ?code=... after exchange succeeds.
     (async function handleAuthRedirect() {
+      const statusEl = document.querySelector("#authStatus");
+
+      function setStatus(msg) {
+        if (statusEl) statusEl.textContent = msg;
+      }
+
+      // Small helper: sometimes session lands a beat later.
+      async function getSessionWithRetry(retries = 3, delayMs = 250) {
+        for (let i = 0; i < retries; i++) {
+          const { data, error } = await window.supabaseClient.auth.getSession();
+          if (error) return { data: null, error };
+          if (data?.session) return { data, error: null };
+          if (i < retries - 1) await new Promise(r => setTimeout(r, delayMs));
+        }
+        return { data: { session: null }, error: null };
+      }
+
       try {
         const url = new URL(window.location.href);
-
-        // PKCE: ?code=...
         const code = url.searchParams.get("code");
-        if (code) {
-          const { error } = await window.supabaseClient.auth.exchangeCodeForSession(code);
-          if (error) console.warn("exchangeCodeForSession error:", error);
 
+        if (code) {
+          setStatus("Completing login…");
+
+          const { data, error } = await window.supabaseClient.auth.exchangeCodeForSession(code);
+
+          if (error) {
+            console.warn("exchangeCodeForSession error:", error);
+            // DO NOT delete the code on failure. Keeps it debuggable and lets you retry.
+            setStatus(`Login failed: ${error.message}`);
+            return;
+          }
+
+          // Exchange succeeded. Now we can clean the URL.
           url.searchParams.delete("code");
           window.history.replaceState({}, document.title, url.pathname + url.search);
         }
 
-        // IMPORTANT: do NOT wipe hash until we confirm session exists
-        const { data } = await window.supabaseClient.auth.getSession();
+        // Handle legacy hash tokens (rare on v2 PKCE, but safe)
+        // Only remove hash if we confirm a session exists.
+        const { data: sData, error: sErr } = await getSessionWithRetry();
 
-        if (data?.session) {
-          // now it's safe to clean up any #access_token stuff
+        if (sErr) {
+          console.warn("getSession error:", sErr);
+          setStatus(`Session check failed: ${sErr.message}`);
+          return;
+        }
+
+        if (sData?.session) {
+          // Safe to clean hash now
           if (window.location.hash && window.location.hash.includes("access_token")) {
             window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
           }
+          // Let your existing refreshUI() drive the final UI state
+          // (refreshUI is defined later in your script; calling it here is optional)
+          setStatus("Signed in. Loading…");
         } else {
-          // If we got here with access_token in hash but no session, DON'T delete the hash.
-          // That preserves info for supabase-js to parse.
-          if (window.location.hash && window.location.hash.includes("access_token")) {
-            console.warn("Hash token present but session not set yet. Leaving hash intact.");
+          // No session. If user just arrived from a magic link, this message is crucial.
+          if (code) {
+            // We shouldn't reach this often because code block above returns on exchange failure.
+            setStatus("Login did not complete. Please try the newest link again.");
+          } else {
+            setStatus("Not signed in.");
           }
         }
       } catch (e) {
         console.warn("handleAuthRedirect failed:", e);
+        setStatus("Login redirect failed. Please try requesting a new link.");
       }
     })();
+
 
 
     async function getUser() {
